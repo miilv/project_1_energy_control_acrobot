@@ -235,7 +235,7 @@ def plot_comparison_error(results_by_name, save_path):
                     linewidth=1.5, label=labels.get(name, name))
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Weighted state-error norm (log scale)")
-    ax.set_title("Comparison: only the adaptive controller drives the error to zero")
+    ax.set_title("Comparison: under unknown friction, only the adaptive controller drives the error to zero")
     ax.grid(True, which="both", alpha=0.4)
     ax.legend()
     fig.tight_layout()
