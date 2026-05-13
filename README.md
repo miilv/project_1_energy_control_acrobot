@@ -8,7 +8,7 @@ self-contained piece with its own code, plots, animation, slides, and notes.
 |---|--------|--------|
 | 1 | [`project_1_energy_control_acrobot/`](project_1_energy_control_acrobot/) | Energy-shaping swing-up + LQR |
 | 2 | [`project_2_adaptive_control_acrobot/`](project_2_adaptive_control_acrobot/) | Adaptive friction control |
-| 3 | _project_3_..._ | Backstepping |
+| 3 | [`project_3_backstepping_acrobot/`](project_3_backstepping_acrobot/) | Backstepping under actuator dynamics |
 | 4 | _project_4_..._ | Model-predictive control |
 
 To run a piece, `cd` into its folder and follow that folder's README.
