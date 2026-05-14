@@ -268,6 +268,101 @@ full 5D Riccati solution demands gains that saturate against $u_{\max}$
 and destabilise the closed loop on entry, while the conservative 4D-based
 gain plus an actuator damping term reliably catches the swing-up exit.
 
+#### 3.7.1 Local stability proof for the LQR phase
+
+This part of the closed loop can be proven rigorously, but only as a
+*local* result around the upright equilibrium and only inside the region
+where the command saturation is inactive.
+
+Let the local error coordinates be
+
+$$
+\xi =
+\begin{bmatrix}
+q_1-\pi/2 & q_2 & \dot q_1 & \dot q_2 & \tau_2
+\end{bmatrix}^{\top},
+$$
+
+with $q_1-\pi/2$ wrapped to $[-\pi,\pi]$. In these coordinates, the
+5D plant linearized at the upright equilibrium has the form
+
+$$
+\dot \xi = A\xi + Bu + r(\xi),
+\qquad
+\frac{\|r(\xi)\|}{\|\xi\|} \to 0
+\quad\text{as}\quad \xi \to 0,
+$$
+
+because the manipulator dynamics and actuator dynamics are smooth near
+$(q_1,q_2,\dot q_1,\dot q_2,\tau_2)=(\pi/2,0,0,0,0)$ and the mass matrix
+is nonsingular. The LQR-phase controller applies
+
+$$
+u = -K\xi,
+\qquad
+K =
+\begin{bmatrix}
+-238.573 & -95.623 & -103.009 & -48.631 & 1.000
+\end{bmatrix}.
+$$
+
+For the implemented parameters, the eigenvalues of the closed-loop
+linearization $A_{\mathrm{cl}} = A - BK$ are
+
+$$
+\lambda(A_{\mathrm{cl}}) =
+\{-391.426,\; -6.163,\; -2.239,\;
+-0.0863 \pm 3.7451i\}.
+$$
+
+All eigenvalues have strictly negative real part, so $A_{\mathrm{cl}}$ is
+Hurwitz. Therefore, for any positive definite matrix $Q_L$, the Lyapunov
+equation
+
+$$
+A_{\mathrm{cl}}^{\top}P + P A_{\mathrm{cl}} = -Q_L
+$$
+
+has a unique positive definite solution $P = P^\top > 0$. Consider
+$V_L(\xi)=\xi^\top P\xi$. Along the nonlinear unsaturated LQR-phase
+closed loop,
+
+$$
+\dot V_L
+= \xi^\top(A_{\mathrm{cl}}^{\top}P + P A_{\mathrm{cl}})\xi
+  + 2\xi^\top P r(\xi)
+= -\xi^\top Q_L\xi + 2\xi^\top P r(\xi).
+$$
+
+Since $r(\xi)=o(\|\xi\|)$, there exists a radius $\rho_1>0$ such that,
+for $\|\xi\|<\rho_1$,
+
+$$
+2|\xi^\top P r(\xi)| \le
+\tfrac12\lambda_{\min}(Q_L)\|\xi\|^2 .
+$$
+
+Hence
+
+$$
+\dot V_L \le
+-\tfrac12\lambda_{\min}(Q_L)\|\xi\|^2 < 0
+\qquad \text{for } 0<\|\xi\|<\rho_1 .
+$$
+
+Finally, saturation does not affect this local result: because
+$u=-K\xi$ is continuous and $u_{\max}=50$ N m, there exists a smaller
+radius $\rho_2>0$ such that $\| \xi \|<\rho_2$ implies $|K\xi|<50$.
+For every initial condition inside
+$\|\xi(0)\|<\rho=\min(\rho_1,\rho_2)$, the saturation is inactive and the
+nonlinear LQR-phase closed loop is locally exponentially stable at the
+upright equilibrium.
+
+This proves local exponential stability of the post-switch LQR phase.
+It does **not** prove that the swing-up controller always enters this
+local region; that reachability claim is supported by simulation for the
+chosen initial condition.
+
 ### 3.8 Hand-over criterion
 
 Switch from backstepping swing-up to LQR when
