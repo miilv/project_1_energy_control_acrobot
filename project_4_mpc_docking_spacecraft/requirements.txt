@@ -2,4 +2,5 @@ numpy
 scipy
 matplotlib
 cvxpy
+ecos
 osqp
