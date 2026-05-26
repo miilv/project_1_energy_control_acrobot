@@ -38,9 +38,14 @@ def plot_state_trajectories(result, save_path):
     axes[1].plot(result["t"], result["vx"], label=r"$\dot x$")
     axes[1].plot(result["t"], result["vy"], label=r"$\dot y$")
     axes[1].axhline(0.0, color="gray", linestyle=":", alpha=0.6)
+    v_max = result.get("v_max")
+    if v_max is not None:
+        axes[1].axhline(v_max, color="red", linestyle="--", alpha=0.7,
+                        label=fr"$\pm v_\mathrm{{max}} = {v_max:g}$ m/s")
+        axes[1].axhline(-v_max, color="red", linestyle="--", alpha=0.7)
     axes[1].set_xlabel("Time [s]")
     axes[1].set_ylabel("Relative velocity [m/s]")
-    axes[1].set_title("Relative velocity: damped to zero at docking")
+    axes[1].set_title(r"Relative velocity: state constraint $|\dot x|, |\dot y| \leq v_\mathrm{max}$")
     axes[1].grid(True, alpha=0.4)
     axes[1].legend()
 
@@ -215,20 +220,55 @@ def plot_comparison_thrust(results_by_name, save_path):
 
 
 def plot_constraint_violations(results_by_name, save_path):
-    """Bar chart of total constraint-violation steps per scenario."""
+    """Grouped bar chart of input and state constraint violations per scenario."""
     _ensure_dir(save_path)
     names = list(results_by_name.keys())
-    counts = [results_by_name[n]["violation_count"] for n in names]
+    in_counts = [results_by_name[n]["violation_count"] for n in names]
+    st_counts = [results_by_name[n].get("state_violation_count", 0) for n in names]
     labels = [_LABELS.get(n, n) for n in names]
-    colors = [_COLORS.get(n, "gray") for n in names]
-    fig, ax = plt.subplots(figsize=(9, 5))
-    bars = ax.bar(labels, counts, color=colors)
-    for bar, c in zip(bars, counts):
-        ax.text(bar.get_x() + bar.get_width() / 2.0, bar.get_height() + 0.2,
-                str(c), ha="center", va="bottom", fontsize=11)
-    ax.set_ylabel("Steps with $\\|u\\|_\\infty > T_\\mathrm{max}$")
-    ax.set_title("Comparison: input-constraint violations across scenarios")
+    width = 0.4
+    x_pos = np.arange(len(names))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars_in = ax.bar(x_pos - width / 2.0, in_counts, width,
+                     color="indianred", label=r"input: $\|u\|_\infty > T_\mathrm{max}$")
+    bars_st = ax.bar(x_pos + width / 2.0, st_counts, width,
+                     color="steelblue", label=r"state: $\max(|\dot x|, |\dot y|) > v_\mathrm{max}$")
+    for bar, c in zip(bars_in, in_counts):
+        ax.text(bar.get_x() + bar.get_width() / 2.0, bar.get_height() + 0.5,
+                str(c), ha="center", va="bottom", fontsize=10)
+    for bar, c in zip(bars_st, st_counts):
+        ax.text(bar.get_x() + bar.get_width() / 2.0, bar.get_height() + 0.5,
+                str(c), ha="center", va="bottom", fontsize=10)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("Number of violations")
+    ax.set_title("Comparison: input and state constraint violations across scenarios")
     ax.grid(True, axis="y", alpha=0.4)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_comparison_velocity(results_by_name, save_path):
+    """Per-scenario max(|x_dot|, |y_dot|)(t) vs the velocity bound."""
+    _ensure_dir(save_path)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    v_max = None
+    for name, r in results_by_name.items():
+        v_norm = np.maximum(np.abs(r["vx"]), np.abs(r["vy"]))
+        ax.plot(r["t"], v_norm, linewidth=1.4,
+                color=_COLORS.get(name), label=_LABELS.get(name, name))
+        if r.get("v_max") is not None:
+            v_max = r["v_max"]
+    if v_max is not None:
+        ax.axhline(v_max, color="black", linestyle="--", alpha=0.7,
+                   label=fr"$v_\mathrm{{max}} = {v_max:g}$ m/s")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel(r"$\max(|\dot x|, |\dot y|)$ [m/s]")
+    ax.set_title("Comparison: relative-velocity envelope vs the state-constraint bound")
+    ax.grid(True, alpha=0.4)
+    ax.legend()
     fig.tight_layout()
     fig.savefig(save_path, dpi=150)
     plt.close(fig)

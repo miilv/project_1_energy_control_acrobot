@@ -41,9 +41,9 @@ ANIM_DIR = PROJECT_ROOT / "animations"
 SCENARIOS = ("mpc", "lqr_unconstrained", "lqr_saturated")
 
 
-def _build_controller(name, system, mpc_params, T_max):
+def _build_controller(name, system, mpc_params, T_max, v_max=None):
     if name == "mpc":
-        return LinearMPCController(system, mpc_params, T_max)
+        return LinearMPCController(system, mpc_params, T_max, v_max=v_max)
     if name == "lqr_unconstrained":
         return LQRController(system, mpc_params)
     if name == "lqr_saturated":
@@ -79,6 +79,7 @@ def main():
     print(f"  orbital rate n     = {phys.n:.4e} rad/s  (period {phys.period:.1f} s)")
     print(f"  chaser mass        = {phys.m:.1f} kg")
     print(f"  per-axis thrust    = +/- {phys.T_max:.1f} N")
+    print(f"  per-axis velocity  = +/- {phys.v_max:.2f} m/s   (MPC state constraint)")
     print(f"  initial state      = {tuple(sim_params.x0)}")
     print(f"  simulation horizon = {sim_params.t_final:.1f} s")
     print()
@@ -87,16 +88,16 @@ def main():
     results = {}
     for name in scenarios:
         print(f"--- running {name} ---")
-        ctrl = _build_controller(name, system, mpc_params, phys.T_max)
+        ctrl = _build_controller(name, system, mpc_params, phys.T_max, v_max=phys.v_max)
         if name == "mpc":
             print(f"  rho admissible = {ctrl.rho_admissible:.4e}, rho used = {ctrl.rho:.4e}")
             A_K_eigs = np.linalg.eigvals(ctrl.A_K)
             print(f"  max |lambda(A_K)| = {max(abs(A_K_eigs)):.6f}   (Schur => stable)")
-        r = simulate(system, ctrl, sim_params, phys.T_max)
+        r = simulate(system, ctrl, sim_params, phys.T_max, v_max=phys.v_max)
         results[name] = r
         end_range = float(np.sqrt(r['x'][-1] ** 2 + r['y'][-1] ** 2))
-        print(f"  final range = {end_range:.3f} m, violations = {r['violation_count']}, "
-              f"final J = {r['J'][-1]:.3e}")
+        print(f"  final range = {end_range:.3f} m, input violations = {r['violation_count']}, "
+              f"state violations = {r['state_violation_count']}, final J = {r['J'][-1]:.3e}")
         print()
 
     print("--- generating per-scenario figures ---")
@@ -108,6 +109,7 @@ def main():
         viz.plot_comparison_position(results, str(FIG_DIR / "comparison_position.png"))
         viz.plot_comparison_J(results, str(FIG_DIR / "comparison_lyapunov.png"))
         viz.plot_comparison_thrust(results, str(FIG_DIR / "comparison_thrust.png"))
+        viz.plot_comparison_velocity(results, str(FIG_DIR / "comparison_velocity.png"))
         viz.plot_constraint_violations(results, str(FIG_DIR / "comparison_violations.png"))
 
     if not args.no_anim:

@@ -15,7 +15,7 @@ conventions used elsewhere in the project for direct plug-in to
 import numpy as np
 
 
-def simulate(system, controller, sim_params, T_max):
+def simulate(system, controller, sim_params, T_max, v_max=None):
     """Run one closed-loop trajectory.
 
     Parameters
@@ -57,8 +57,11 @@ def simulate(system, controller, sim_params, T_max):
     control = np.zeros((n_steps, nu))
     J = np.zeros(n_steps + 1)
     violations = np.zeros(n_steps, dtype=int)
+    state_violations = np.zeros(n_steps + 1, dtype=int)
 
     state[0] = np.asarray(sim_params.x0, dtype=float)
+    if v_max is not None and max(abs(state[0, 2]), abs(state[0, 3])) > v_max + 1e-9:
+        state_violations[0] = 1
 
     for k in range(n_steps):
         x_k = state[k]
@@ -69,6 +72,8 @@ def simulate(system, controller, sim_params, T_max):
             violations[k] = 1
         # ZOH update including the additive disturbance.
         state[k + 1] = system.A_d @ x_k + system.B_d @ (u_k + w_thrust)
+        if v_max is not None and max(abs(state[k + 1, 2]), abs(state[k + 1, 3])) > v_max + 1e-9:
+            state_violations[k + 1] = 1
 
     # Lyapunov value at the terminal state, for plotting continuity.
     _, J[n_steps] = controller.compute(state[n_steps])
@@ -86,9 +91,12 @@ def simulate(system, controller, sim_params, T_max):
         "J": J,
         "violations": violations,
         "violation_count": int(violations.sum()),
+        "state_violations": state_violations,
+        "state_violation_count": int(state_violations.sum()),
         "state": state,
         "control": control,
         "Ts": Ts,
         "T_max": float(T_max),
+        "v_max": None if v_max is None else float(v_max),
         "disturbance": np.asarray(sim_params.disturbance, dtype=float).copy(),
     }

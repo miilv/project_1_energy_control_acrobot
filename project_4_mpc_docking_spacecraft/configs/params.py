@@ -20,6 +20,7 @@ class PhysicalParams:
     R_earth: float = 6378e3        # Earth equatorial radius [m]
     m: float = 500.0               # chaser mass [kg]  (small inspector class)
     T_max: float = 50.0            # per-axis thrust limit [N]   (small RCS jet)
+    v_max: float = 0.5             # per-axis relative velocity bound [m/s] (state constraint)
     Ts: float = 1.0                # sampling period [s]
 
     @property

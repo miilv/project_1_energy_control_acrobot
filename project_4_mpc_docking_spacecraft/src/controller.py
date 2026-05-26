@@ -83,7 +83,7 @@ class LinearMPCController:
     next sampling instant.
     """
 
-    def __init__(self, system, mpc_params, T_max):
+    def __init__(self, system, mpc_params, T_max, v_max=None, v_margin=0.05):
         self.A_d = np.asarray(system.A_d, dtype=float).copy()
         self.B_d = np.asarray(system.B_d, dtype=float).copy()
         self.nx = self.A_d.shape[0]
@@ -92,6 +92,14 @@ class LinearMPCController:
         self.Q = np.asarray(mpc_params.Q, dtype=float).copy()
         self.R = np.asarray(mpc_params.R, dtype=float).copy()
         self.T_max = float(T_max)
+        # State constraint on per-axis relative velocity.  ``None`` means
+        # "no state constraint"; a positive value adds the box
+        # |x_dot|, |y_dot| <= v_max to the MPC formulation.
+        self.v_max = None if v_max is None else float(v_max)
+        # Robustness margin: plan against a tighter bound v_max * (1 - margin)
+        # so additive process disturbance does not push the actual state
+        # outside the reported v_max.  This is a poor-man's tube-MPC.
+        self.v_margin = float(v_margin)
         self.use_terminal_set = bool(mpc_params.use_terminal_set)
 
         # Riccati / LQR ingredients.
@@ -127,6 +135,29 @@ class LinearMPCController:
                 self._x_var[:, k + 1] == self.A_d @ self._x_var[:, k] + self.B_d @ self._u_var[:, k],
                 self._u_var[:, k] <= self.T_max,
                 self._u_var[:, k] >= -self.T_max,
+            ]
+            if self.v_max is not None:
+                # Velocity components are states 2 and 3 (x_dot, y_dot).
+                # Enforced on the predicted states from the second step on
+                # (predicted state 0 is the current measurement; if it is
+                # already outside the box, no instantaneous action can fix
+                # it).  We tighten by ``v_margin`` so an additive disturbance
+                # cannot push the *actual* state past the reported bound.
+                v_plan = self.v_max * (1.0 - self.v_margin)
+                if k >= 1:
+                    constraints += [
+                        self._x_var[2, k] <= v_plan,
+                        self._x_var[2, k] >= -v_plan,
+                        self._x_var[3, k] <= v_plan,
+                        self._x_var[3, k] >= -v_plan,
+                    ]
+        if self.v_max is not None:
+            v_plan = self.v_max * (1.0 - self.v_margin)
+            constraints += [
+                self._x_var[2, self.N] <= v_plan,
+                self._x_var[2, self.N] >= -v_plan,
+                self._x_var[3, self.N] <= v_plan,
+                self._x_var[3, self.N] >= -v_plan,
             ]
         cost += cp.quad_form(self._x_var[:, self.N], P_psd)
         if self.use_terminal_set:
