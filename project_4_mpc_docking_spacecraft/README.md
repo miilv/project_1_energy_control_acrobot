@@ -14,7 +14,21 @@
 A chaser spacecraft must rendezvous with a passive target on a circular reference orbit around Earth. The chaser is modelled by the Clohessy-Wiltshire (CW) equations expressed in the target's local-vertical / local-horizontal (LVLH) frame. The CW equations are an **exact** linearisation of the relative orbital dynamics for small relative separations on a circular target orbit, so the resulting plant is genuinely LTI - no approximation residual.
 
 ### Control objective
-Drive the chaser's relative state to the origin (the docking point) and stabilise it there, **subject to two constraint families**: an input bound on per-axis thrust ($\|\mathbf{u}\|_\infty \le T_\mathrm{max}$, the actuator limit) and a state bound on per-axis relative velocity ($|\dot x|, |\dot y| \le v_\mathrm{max}$, a soft-docking safety envelope that prevents the chaser from approaching the target too fast). A constant additive disturbance models residual orbital perturbations such as differential drag.
+Drive the chaser's relative state to the origin (the docking point) and stabilise it there, **subject to two constraint families**:
+
+- an input bound on per-axis thrust (the actuator limit)
+
+  $$
+  \|\mathbf{u}\|_\infty \le T_\mathrm{max},
+  $$
+
+- a state bound on per-axis relative velocity (a soft-docking safety envelope that prevents the chaser from approaching the target too fast)
+
+  $$
+  |\dot x|, |\dot y| \le v_\mathrm{max}.
+  $$
+
+A constant additive disturbance models residual orbital perturbations such as differential drag.
 
 ### Class of methods
 **Constrained linear model-predictive control with a terminal cost and terminal set.** The MPC value function $J^*$ is constructed jointly with the LQR-derived terminal ingredients so that the closed loop admits a clean stability proof in the Mayne-Rawlings framework (Section 3).
@@ -107,7 +121,7 @@ This section first states the MPC optimisation problem (3.1), then derives the t
 
 ### 3.1 The receding-horizon problem
 
-At every sampling instant $k T_s$ the controller observes $\mathbf{x}_k$ and solves a finite-horizon optimal control problem over the next $N$ steps:
+At every sampling instant the controller observes the current state and solves a finite-horizon optimal control problem over the next $N$ steps:
 
 $$
 \min_{\mathbf{u}_0, \dots, \mathbf{u}_{N-1}} \sum_{i=0}^{N-1}\bigl(\mathbf{x}_i^\top Q \mathbf{x}_i + \mathbf{u}_i^\top R \mathbf{u}_i\bigr) + \mathbf{x}_N^\top P \mathbf{x}_N
@@ -193,7 +207,13 @@ $$
 
 Two requirements must hold simultaneously for $X_f$ to play its role in the MPC stability proof:
 
-1. **Forward invariance under the terminal controller.** Setting the input to the LQR feedback on $X_f$ keeps the trajectory inside $X_f$. From the Riccati identity in 3.2 we have $A_K^\top P A_K \preceq P$, so for every state in the ellipsoid
+1. **Forward invariance under the terminal controller.** Setting the input to the LQR feedback on the terminal set keeps the trajectory inside it. From the Riccati identity in 3.2 we have the contraction inequality
+
+   $$
+   A_K^\top P A_K \preceq P,
+   $$
+
+   so for every state in the ellipsoid
 
    $$
    (A_K \mathbf{x})^\top P (A_K \mathbf{x}) \le \mathbf{x}^\top P \mathbf{x} \le \rho.
@@ -201,7 +221,7 @@ Two requirements must hold simultaneously for $X_f$ to play its role in the MPC 
 
    Forward invariance therefore holds for **every** $\rho > 0$.
 
-2. **Input admissibility.** For every state in $X_f$, the LQR action must lie inside $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
+2. **Input admissibility.** For every state in the terminal set, the LQR action must lie inside the input box $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
 
 $$
 |\mathbf{k}_i^\top \mathbf{x}|^2 \le (\mathbf{k}_i^\top P^{-1} \mathbf{k}_i)(\mathbf{x}^\top P \mathbf{x}) \le \rho \cdot \mathbf{k}_i^\top P^{-1} \mathbf{k}_i.
@@ -278,15 +298,15 @@ Each constraint of the MPC problem is checked in turn.
   \mathbf{u}_1^\star, \dots, \mathbf{u}_{N-1}^\star,
   $$
 
-  all in $\mathcal{U}$ by feasibility of the previous solution. The appended input is $-K \mathbf{x}_N^\star$, which lies in $\mathcal{U}$ because the terminal state lies in $X_f$ and we have chosen $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
+  all in $\mathcal{U}$ by feasibility of the previous solution. The appended input is the LQR action evaluated at the previous terminal state; it lies in $\mathcal{U}$ because the terminal state lies in the terminal set and we have chosen the input-admissible $\rho$ (Section 3.3).
 - **State bounds.** Predicted states from the previous solution
 
   $$
   \mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star
   $$
 
-  all lie in $\mathcal{X}$. The newly appended state lies in $X_f$ by forward invariance, and the choice $\rho \le \rho^\star_\mathrm{st}$ guarantees it also lies in $\mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
-- **Terminal set.** The appended terminal state is the LQR-update of the previous terminal state; by forward invariance of $X_f$, it lies in $X_f$.
+  all lie in $\mathcal{X}$. The newly appended state lies in the terminal set by forward invariance, and the state-admissible choice of $\rho$ guarantees it also lies in $\mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
+- **Terminal set.** The appended terminal state is the LQR-update of the previous terminal state; by forward invariance, it lies in the terminal set.
 
 All MPC constraints are satisfied, so the candidate is feasible at the next step. $\square$
 
@@ -358,7 +378,7 @@ $$
 \mathbf{x}_k \to 0 \quad\text{and}\quad \mathbf{u}_k^\star \to 0 \quad\text{as } k \to \infty.
 $$
 
-The MPC closed loop is therefore asymptotically stable with region of attraction equal to the feasible set $X_N$ -- the set of initial states for which the MPC problem admits a solution. With the default parameters $X_N$ is large enough to include the simulation's initial state.
+The MPC closed loop is therefore asymptotically stable, with region of attraction equal to the MPC feasible set (the set of initial states for which the optimisation admits a solution). With the default parameters this feasible set is large enough to include the simulation's initial state.
 
 Note. The proof is for the **nominal** closed loop (no disturbance). Under the small additive disturbance used in the simulator the chaser converges to a small neighbourhood of the origin rather than to the origin itself - the size of the neighbourhood scales linearly with the disturbance magnitude. Tube-MPC techniques extend the proof to robust convergence; we have not implemented them in this submission.
 
@@ -374,7 +394,7 @@ We ship two LQR baselines whose specific failure modes motivate the constrained 
 
   **roughly five-and-a-half times the actuator bound**, and the resulting transient velocity peaks at about $1.9$ m/s, **nearly four times the state bound**. Both constraint families are violated.
 
-- **Saturated LQR** uses the same gain $K$ but post-hoc clips every command to $\mathcal{U}$ before applying it. The actuator is now respected, but the stability proof of the underlying LQR collapses ($-K \mathbf{x}$ is replaced by a saturation nonlinearity whose closed-loop matrix is no longer $A_K$), and the **state constraint is still violated** -- the saturated input bang-bangs at the limit during the transient and the chaser still overshoots $v_\mathrm{max}$ by about a factor of three. Post-hoc saturation handles the input bound but not the state bound.
+- **Saturated LQR** uses the same gain as the terminal controller above but post-hoc clips every command to the actuator box before applying it. The actuator is now respected, but the stability proof of the underlying LQR collapses: the linear feedback is replaced by a saturation nonlinearity whose closed-loop matrix is no longer $A_K$, and the **state constraint is still violated** -- the saturated input bang-bangs at the limit during the transient and the chaser still overshoots the velocity bound by about a factor of three. Post-hoc saturation handles the input bound but not the state bound.
 
 By contrast the MPC controller treats the actuator bound as a **first-class** constraint in the optimisation, so the closed loop inherits *both* feasibility-by-construction *and* the Lyapunov decrease of Section 3.5.
 
@@ -532,7 +552,7 @@ The thrust comparison is the cleanest expression of the MPC advantage. The uncon
   <img src="figures/comparison_velocity.png" width="720">
 </p>
 
-The relative-velocity envelope shows the second part of the story. The MPC's velocity rides just below the bound for the bang-bang opening of the approach (the controller saturates against $v_\mathrm{max}$, not against $T_\mathrm{max}$) and then decays smoothly. The two LQR baselines overshoot the bound by a factor of three (saturated) to four (unconstrained) during the transient, because neither has any state-constraint awareness.
+The relative-velocity envelope shows the second part of the story. The MPC's velocity rides just below the bound for the bang-bang opening of the approach -- the controller saturates against the velocity constraint rather than the thrust constraint -- and then decays smoothly. The two LQR baselines overshoot the bound by a factor of three (saturated) to four (unconstrained) during the transient, because neither has any state-constraint awareness.
 
 <p align="center">
   <img src="figures/comparison_violations.png" width="640">
@@ -562,7 +582,7 @@ with the same Riccati $P$. The MPC's $J^\star$ is larger early on because the co
 ### Limitations
 - The stability proof of Section 3.5 is for the nominal closed loop. Under the additive disturbance the chaser converges to a small neighbourhood of the origin rather than to the origin itself; a tube-MPC or offset-free reformulation would close this gap at the cost of additional ingredients.
 - The MPC uses an LTI model: CW is exact for circular target orbits and small relative separations. Eccentric orbits or large separations would require the Yamanaka-Ankersen extension or a nonlinear two-body MPC.
-- The terminal set $X_f$ is sized by the closed-form admissibility bound; the **maximal** positively invariant set under the LQR plus input box would be larger and would expand the feasible region $X_N$.
+- The terminal set is sized by the closed-form admissibility bound; the **maximal** positively invariant set under the LQR plus input box would be larger and would expand the MPC feasible region accordingly.
 - Computation: each MPC solve takes a few milliseconds with CVXPY + ECOS (with SCS as a fallback if ECOS is unavailable); a hand-rolled QP would be markedly faster but at the cost of code readability.
 
 ---
