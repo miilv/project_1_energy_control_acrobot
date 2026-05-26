@@ -163,7 +163,7 @@ Two requirements must hold simultaneously for $X_f$ to play its role in the MPC 
 
 1. **Forward invariance under the terminal controller.** Setting $\mathbf{u} = -K\mathbf{x}$ on $X_f$ keeps the trajectory inside $X_f$. From the Riccati identity in 3.2, $A_K^\top P A_K \preceq P$, so for every $\mathbf{x} \in X_f$ we have $(A_K \mathbf{x})^\top P (A_K \mathbf{x}) \le \mathbf{x}^\top P \mathbf{x} \le \rho$. Forward invariance holds for **every** $\rho > 0$.
 
-2. **Constraint admissibility.** For every $\mathbf{x} \in X_f$, the LQR action $-K \mathbf{x}$ must lie inside $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
+2. **Input admissibility.** For every $\mathbf{x} \in X_f$, the LQR action $-K \mathbf{x}$ must lie inside $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
 
 $$
 |\mathbf{k}_i^\top \mathbf{x}|^2 \le (\mathbf{k}_i^\top P^{-1} \mathbf{k}_i)(\mathbf{x}^\top P \mathbf{x}) \le \rho \cdot \mathbf{k}_i^\top P^{-1} \mathbf{k}_i.
@@ -172,10 +172,18 @@ $$
 Requiring $|\mathbf{k}_i^\top \mathbf{x}| \le T_\mathrm{max}$ on every channel imposes
 
 $$
-\rho \le \rho^\star := \frac{T_\mathrm{max}^2}{\max_i \mathbf{k}_i^\top P^{-1} \mathbf{k}_i}.
+\rho \le \rho^\star_\mathrm{in} := \frac{T_\mathrm{max}^2}{\max_i \mathbf{k}_i^\top P^{-1} \mathbf{k}_i}.
 $$
 
-The controller computes $\rho^\star$ analytically at construction time and clips any user-supplied $\rho$ to $[0, \rho^\star]$. With the default configuration this yields $\rho^\star \approx 1380$ for $T_\mathrm{max} = 50$ N.
+3. **State admissibility.** Because the candidate-shift sequence used in Section 3.4 places the appended state $A_K \mathbf{x}_N^\star$ inside $X_f$, that state must also satisfy the velocity box $\mathcal{X}$ from Section 2 to be a feasible MPC step. The same Cauchy-Schwarz argument applied to the coordinate-axis rows $\mathbf{e}_i$ for $i \in \{3, 4\}$ (the $\dot x, \dot y$ components) gives
+
+$$
+\rho \le \rho^\star_\mathrm{st} := \frac{v_\mathrm{plan}^2}{\max_{i \in \{3,4\}} \mathbf{e}_i^\top P^{-1} \mathbf{e}_i},
+$$
+
+where $v_\mathrm{plan} = v_\mathrm{max}(1 - \mathrm{margin})$ is the tightened velocity bound the MPC plans against.
+
+The controller computes both $\rho^\star_\mathrm{in}$ and $\rho^\star_\mathrm{st}$ analytically at construction time and uses $\rho^\star = \min(\rho^\star_\mathrm{in}, \rho^\star_\mathrm{st})$. With the default configuration this yields $\rho^\star_\mathrm{in} \approx 1380$ (input-binding) and $\rho^\star_\mathrm{st} \approx 594$ (state-binding), so $\rho^\star = 594$ -- the velocity constraint is the tighter one.
 
 ### 3.4 Recursive feasibility
 
@@ -190,7 +198,8 @@ $$
 The candidate's predicted states are $(\mathbf{x}_1^\star, \mathbf{x}_2^\star, \dots, \mathbf{x}_N^\star, A_K \mathbf{x}_N^\star)$. Each constraint of the MPC problem is checked in turn.
 
 - **Dynamics.** Each transition $\mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star$ for $i = 1, \dots, N-1$ holds by the optimality of $\mathbf{u}^\star$ at $\mathbf{x}_k$; the appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
-- **Input bounds.** $\mathbf{u}_i^\star \in \mathcal{U}$ for $i = 1, \dots, N-1$ by feasibility of $\mathbf{u}^\star$. The appended input $-K \mathbf{x}_N^\star$ lies in $\mathcal{U}$ because $\mathbf{x}_N^\star \in X_f$ and $\rho \le \rho^\star$ (Section 3.3).
+- **Input bounds.** $\mathbf{u}_i^\star \in \mathcal{U}$ for $i = 1, \dots, N-1$ by feasibility of $\mathbf{u}^\star$. The appended input $-K \mathbf{x}_N^\star$ lies in $\mathcal{U}$ because $\mathbf{x}_N^\star \in X_f$ and $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
+- **State bounds.** Predicted states $\mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star \in \mathcal{X}$ by feasibility of $\mathbf{u}^\star$. The newly appended state is $A_K \mathbf{x}_N^\star \in X_f$ by forward invariance, and $\rho \le \rho^\star_\mathrm{st}$ guarantees $A_K \mathbf{x}_N^\star \in \mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
 - **Terminal set.** The appended terminal state is $A_K \mathbf{x}_N^\star$; by forward invariance of $X_f$, this lies in $X_f$.
 
 All MPC constraints are satisfied. Hence $\hat{\mathbf{u}}$ is feasible at $\mathbf{x}_{k+1}$. $\square$
@@ -313,7 +322,7 @@ Outputs:   trajectory  (t_k, x_k, u_k, J*_k)  for k = 0, ..., n_steps
 | Per-axis velocity bound | $v_\mathrm{max}$ | 0.5 m/s |
 | Robustness margin on $v_\mathrm{max}$ | -- | 5 % |
 | Sampling period | $T_s$ | 1 s |
-| Prediction horizon | $N$ | 60 steps |
+| Prediction horizon | $N$ | 90 steps |
 | State weight | $Q$ | $\mathrm{diag}(10, 10, 1, 1)$ |
 | Input weight | $R$ | $\mathrm{diag}(0.1, 0.1)$ |
 | Terminal-set radius | $\rho$ | $\rho^\star$ (auto: admissibility bound) |
@@ -334,6 +343,7 @@ numpy
 scipy
 matplotlib
 cvxpy
+ecos
 osqp
 ```
 
@@ -418,7 +428,7 @@ The grouped-bar chart numerically confirms the comparison: **zero input violatio
   <img src="figures/comparison_lyapunov.png" width="720">
 </p>
 
-The Lyapunov overlay shows all three controllers driving the cost down by several orders of magnitude. The constrained MPC's decrease is **provably monotone** (Section 3.5); the saturated-LQR Lyapunov value is non-monotone in places because the underlying gain is no longer matched to the saturated dynamics, and the closed loop is no longer covered by the LQR stability proof.
+The Lyapunov overlay shows all three controllers driving a Lyapunov-style scalar down by several orders of magnitude. **The plotted quantity is not identical across scenarios**: for the constrained MPC it is the optimisation value $J^\star(x_k)$; for the LQR baselines it is the quadratic $x_k^\top P x_k$ with the same Riccati $P$. The MPC's $J^\star$ is larger early on because the controller is paying the cost of respecting the velocity constraint -- the LQR baselines reach a lower $x_k^\top P x_k$ in the same time window only by violating $v_\mathrm{max}$ (see Section 7.3 velocity comparison). MPC's decrease is **provably non-increasing** in the nominal closed loop (Section 3.5); the saturated-LQR scalar is non-monotone in places because the underlying gain is no longer matched to the saturated dynamics.
 
 ### What works
 - $J^\star(\mathbf{x}_k)$ is monotone non-increasing along the **nominal** closed loop, as proved in Section 3.5; the disturbed run shows only sub-$10^{-3}$ non-monotone fluctuations in the terminal neighbourhood.
@@ -431,7 +441,7 @@ The Lyapunov overlay shows all three controllers driving the cost down by severa
 - The stability proof of Section 3.5 is for the nominal closed loop. Under the additive disturbance the chaser converges to a small neighbourhood of the origin rather than to the origin itself; a tube-MPC or offset-free reformulation would close this gap at the cost of additional ingredients.
 - The MPC uses an LTI model: CW is exact for circular target orbits and small relative separations. Eccentric orbits or large separations would require the Yamanaka-Ankersen extension or a nonlinear two-body MPC.
 - The terminal set $X_f$ is sized by the closed-form admissibility bound; the **maximal** positively invariant set under the LQR plus input box would be larger and would expand the feasible region $X_N$.
-- Computation: each MPC solve takes a few milliseconds with CVXPY + ECOS; a hand-rolled QP would be markedly faster but at the cost of code readability.
+- Computation: each MPC solve takes a few milliseconds with CVXPY + ECOS (with SCS as a fallback if ECOS is unavailable); a hand-rolled QP would be markedly faster but at the cost of code readability.
 
 ---
 
