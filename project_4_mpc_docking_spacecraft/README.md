@@ -18,15 +18,15 @@ Drive the chaser's relative state to the origin (the docking point) and stabilis
 
 - an input bound on per-axis thrust (the actuator limit)
 
-  $$
-  \|\mathbf{u}\|_\infty \le T_\mathrm{max},
-  $$
+$$
+\|\mathbf{u}\|_\infty \le T_\mathrm{max},
+$$
 
 - a state bound on per-axis relative velocity (a soft-docking safety envelope that prevents the chaser from approaching the target too fast)
 
-  $$
-  |\dot x|, |\dot y| \le v_\mathrm{max}.
-  $$
+$$
+|\dot x|, |\dot y| \le v_\mathrm{max}.
+$$
 
 A constant additive disturbance models residual orbital perturbations such as differential drag.
 
@@ -209,17 +209,17 @@ Two requirements must hold simultaneously for $X_f$ to play its role in the MPC 
 
 1. **Forward invariance under the terminal controller.** Setting the input to the LQR feedback on the terminal set keeps the trajectory inside it. From the Riccati identity in 3.2 we have the contraction inequality
 
-   $$
-   A_K^\top P A_K \preceq P,
-   $$
+$$
+A_K^\top P A_K \preceq P,
+$$
 
-   so for every state in the ellipsoid
+so for every state in the ellipsoid
 
-   $$
-   (A_K \mathbf{x})^\top P (A_K \mathbf{x}) \le \mathbf{x}^\top P \mathbf{x} \le \rho.
-   $$
+$$
+(A_K \mathbf{x})^\top P (A_K \mathbf{x}) \le \mathbf{x}^\top P \mathbf{x} \le \rho.
+$$
 
-   Forward invariance therefore holds for **every** $\rho > 0$.
+Forward invariance therefore holds for **every** $\rho > 0$.
 
 2. **Input admissibility.** For every state in the terminal set, the LQR action must lie inside the input box $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
 
@@ -287,23 +287,23 @@ Each constraint of the MPC problem is checked in turn.
 
 - **Dynamics.** Each transition holds by the optimality of $\mathbf{u}^\star$ at $\mathbf{x}_k$ for $i = 1, \dots, N - 1$:
 
-  $$
-  \mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star.
-  $$
+$$
+\mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star.
+$$
 
   The appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
 - **Input bounds.** The first $N - 1$ entries of the candidate are the shifted optimal inputs
 
-  $$
-  \mathbf{u}_1^\star, \dots, \mathbf{u}_{N-1}^\star,
-  $$
+$$
+\mathbf{u}_1^\star, \dots, \mathbf{u}_{N-1}^\star,
+$$
 
   all in $\mathcal{U}$ by feasibility of the previous solution. The appended input is the LQR action evaluated at the previous terminal state; it lies in $\mathcal{U}$ because the terminal state lies in the terminal set and we have chosen the input-admissible $\rho$ (Section 3.3).
 - **State bounds.** Predicted states from the previous solution
 
-  $$
-  \mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star
-  $$
+$$
+\mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star
+$$
 
   all lie in $\mathcal{X}$. The newly appended state lies in the terminal set by forward invariance, and the state-admissible choice of $\rho$ guarantees it also lies in $\mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
 - **Terminal set.** The appended terminal state is the LQR-update of the previous terminal state; by forward invariance, it lies in the terminal set.
@@ -388,9 +388,9 @@ We ship two LQR baselines whose specific failure modes motivate the constrained 
 
 - **Unconstrained LQR** uses the same gain $K$ as the terminal controller above, applied at every step with no constraint enforcement. The closed loop is exponentially stable on the linear model, but the gain $K$ is sized for the cost weights $(Q, R)$ without knowledge of the actuator or velocity bounds. Starting from the simulation's initial state, the initial command magnitude is
 
-  $$
-  \|K \mathbf{x}_0\|_\infty \approx 275 \text{ N},
-  $$
+$$
+\|K \mathbf{x}_0\|_\infty \approx 275 \text{ N},
+$$
 
   **roughly five-and-a-half times the actuator bound**, and the resulting transient velocity peaks at about $1.9$ m/s, **nearly four times the state bound**. Both constraint families are violated.
 
