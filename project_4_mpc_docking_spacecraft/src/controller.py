@@ -63,6 +63,26 @@ def terminal_set_rho_admissible(K, P, u_max):
     return (float(u_max) ** 2) / worst
 
 
+def terminal_set_rho_admissible_state(P, v_max, vel_indices=(2, 3)):
+    """Largest rho such that  |x_i| <= v_max  on  { x : x' P x <= rho }  for
+    every state index i in ``vel_indices``.
+
+    Same Cauchy-Schwarz argument as ``terminal_set_rho_admissible`` but with
+    the coordinate-axis rows e_i in place of the LQR rows.  Used to ensure
+    the terminal set lies inside the velocity-state box used in the MPC
+    formulation -- this closes the state-admissibility gap in the
+    recursive-feasibility argument.
+    """
+    P_inv = np.linalg.inv(P)
+    nx = P.shape[0]
+    worst = 0.0
+    for i in vel_indices:
+        e_i = np.zeros(nx)
+        e_i[i] = 1.0
+        worst = max(worst, float(e_i @ P_inv @ e_i))
+    return (float(v_max) ** 2) / worst
+
+
 # ---------------------------------------------------------------------------
 # MPC
 # ---------------------------------------------------------------------------
@@ -106,11 +126,22 @@ class LinearMPCController:
         self.P, self.K = _solve_dare_with_K(self.A_d, self.B_d, self.Q, self.R)
         self.A_K = self.A_d - self.B_d @ self.K
 
-        # Maximum admissible terminal-set radius (constraint-respecting LQR).
-        self.rho_admissible = terminal_set_rho_admissible(self.K, self.P, self.T_max)
+        # Maximum admissible terminal-set radius.  Two requirements combine:
+        #   (a) input admissibility:  || K x ||_inf <= T_max  for x in X_f,
+        #   (b) state admissibility:  |x_dot|, |y_dot| <= v_plan  for x in X_f,
+        # so X_f must lie inside both the input-admissible and the
+        # state-admissible ellipsoids.  rho is clipped to the tighter bound.
+        self.rho_admissible_input = terminal_set_rho_admissible(self.K, self.P, self.T_max)
+        if self.v_max is not None:
+            v_plan = self.v_max * (1.0 - self.v_margin)
+            self.rho_admissible_state = terminal_set_rho_admissible_state(self.P, v_plan)
+            self.rho_admissible = min(self.rho_admissible_input, self.rho_admissible_state)
+        else:
+            self.rho_admissible_state = float("inf")
+            self.rho_admissible = self.rho_admissible_input
         # User-supplied rho: negative sentinel means "auto = admissible max".
         # Positive values are respected but clipped to the admissible bound
-        # so the terminal LQR action stays within +/- T_max.
+        # so the terminal LQR action stays feasible.
         user_rho = float(mpc_params.rho)
         if user_rho <= 0.0:
             self.rho = self.rho_admissible

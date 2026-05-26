@@ -43,12 +43,10 @@ class PhysicalParams:
 class MPCParams:
     """MPC controller parameters."""
 
-    N: int = 60                                       # prediction horizon
+    N: int = 90                                       # prediction horizon
     Q_diag: tuple = (10.0, 10.0, 1.0, 1.0)            # state weights
     R_diag: tuple = (0.1, 0.1)                        # input weights
     rho: float = -1.0                                 # terminal-set level; <=0 means auto (use admissibility bound)
-    cone_angle_deg: float = 10.0                      # docking-cone half-angle
-    cone_active_range: float = 50.0                   # cone active when |s|<=this [m]
     use_terminal_set: bool = True                     # toggle for ablation runs
 
     @property

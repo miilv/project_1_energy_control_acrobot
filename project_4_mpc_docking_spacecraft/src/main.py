@@ -53,11 +53,11 @@ def _build_controller(name, system, mpc_params, T_max, v_max=None):
 
 def _generate_scenario_plots(name, result):
     out = FIG_DIR / name
-    viz.plot_state_trajectories(result, str(out / "states.png"))
-    viz.plot_control(result, str(out / "control.png"))
-    viz.plot_lyapunov(result, str(out / "lyapunov.png"))
-    viz.plot_position_trajectory(result, str(out / "position_trajectory.png"))
-    viz.plot_distance_to_target(result, str(out / "range.png"))
+    viz.plot_state_trajectories(result, str(out / "states.png"), scenario=name)
+    viz.plot_control(result, str(out / "control.png"), scenario=name)
+    viz.plot_lyapunov(result, str(out / "lyapunov.png"), scenario=name)
+    viz.plot_position_trajectory(result, str(out / "position_trajectory.png"), scenario=name)
+    viz.plot_distance_to_target(result, str(out / "range.png"), scenario=name)
 
 
 def main():
@@ -90,9 +90,11 @@ def main():
         print(f"--- running {name} ---")
         ctrl = _build_controller(name, system, mpc_params, phys.T_max, v_max=phys.v_max)
         if name == "mpc":
-            print(f"  rho admissible = {ctrl.rho_admissible:.4e}, rho used = {ctrl.rho:.4e}")
+            print(f"  rho admissible (input) = {ctrl.rho_admissible_input:.4e}")
+            print(f"  rho admissible (state) = {ctrl.rho_admissible_state:.4e}")
+            print(f"  rho used               = {ctrl.rho:.4e}")
             A_K_eigs = np.linalg.eigvals(ctrl.A_K)
-            print(f"  max |lambda(A_K)| = {max(abs(A_K_eigs)):.6f}   (Schur => stable)")
+            print(f"  max |lambda(A_K)|     = {max(abs(A_K_eigs)):.6f}   (Schur => stable)")
         r = simulate(system, ctrl, sim_params, phys.T_max, v_max=phys.v_max)
         results[name] = r
         end_range = float(np.sqrt(r['x'][-1] ** 2 + r['y'][-1] ** 2))
@@ -116,7 +118,7 @@ def main():
         print("--- rendering animations ---")
         for name, r in results.items():
             print(f"  {name}.gif ...")
-            ani.make_gif(r, str(ANIM_DIR / f"{name}.gif"), fps=20)
+            ani.make_gif(r, str(ANIM_DIR / f"{name}.gif"), fps=20, scenario=name)
 
     print("done.")
 
