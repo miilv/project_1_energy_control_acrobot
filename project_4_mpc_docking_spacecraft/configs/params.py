@@ -18,8 +18,8 @@ class PhysicalParams:
     mu: float = 3.986004418e14    # Earth GM [m^3 / s^2]
     altitude: float = 400e3        # orbital altitude AGL [m]
     R_earth: float = 6378e3        # Earth equatorial radius [m]
-    m: float = 5000.0              # chaser mass [kg]  (~Dragon-class)
-    T_max: float = 100.0           # per-axis thrust limit [N]   (~RCS quad)
+    m: float = 500.0               # chaser mass [kg]  (small inspector class)
+    T_max: float = 50.0            # per-axis thrust limit [N]   (small RCS jet)
     Ts: float = 1.0                # sampling period [s]
 
     @property
@@ -42,10 +42,10 @@ class PhysicalParams:
 class MPCParams:
     """MPC controller parameters."""
 
-    N: int = 30                                       # prediction horizon
+    N: int = 60                                       # prediction horizon
     Q_diag: tuple = (10.0, 10.0, 1.0, 1.0)            # state weights
     R_diag: tuple = (0.1, 0.1)                        # input weights
-    rho: float = 1.0                                  # terminal set level
+    rho: float = -1.0                                 # terminal-set level; <=0 means auto (use admissibility bound)
     cone_angle_deg: float = 10.0                      # docking-cone half-angle
     cone_active_range: float = 50.0                   # cone active when |s|<=this [m]
     use_terminal_set: bool = True                     # toggle for ablation runs
@@ -63,8 +63,8 @@ class MPCParams:
 class SimParams:
     """Simulation parameters."""
 
-    x0: tuple = (100.0, 100.0, 0.0, 0.0)  # initial relative state [m, m, m/s, m/s]
-    t_final: float = 300.0                 # simulation horizon [s]
+    x0: tuple = (30.0, 30.0, 0.0, 0.0)    # initial relative state [m, m, m/s, m/s]
+    t_final: float = 200.0                 # simulation horizon [s]
     # Constant additive process noise in the acceleration channel (modelling
     # differential drag, third-body, etc).  Applied to (x_ddot, y_ddot).
     disturbance: tuple = (0.0, 5e-4)
