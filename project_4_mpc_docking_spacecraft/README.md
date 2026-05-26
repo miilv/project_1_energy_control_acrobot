@@ -62,7 +62,7 @@ A constant additive disturbance models residual orbital perturbations such as di
 | --- | --- | --- |
 | $x, y$ | relative position, radial and along-track | m |
 | $\dot x, \dot y$ | relative velocity components | m/s |
-| $u_x, u_y$ | per-axis thrust (control input) | N, $|u_i| \le T_\mathrm{max}$ |
+| $u_x$, $u_y$ | per-axis thrust (control input) | N, bounded by $T_\mathrm{max}$ |
 | $n$ | target's mean orbital rate | rad/s |
 | $m$ | chaser mass | kg |
 | $T_\mathrm{max}$ | per-axis thrust bound (input constraint) | N |
@@ -107,11 +107,23 @@ $$
 \exp\!\Bigl(\begin{bmatrix} A & B \\ 0 & 0 \end{bmatrix} T_s\Bigr) = \begin{bmatrix} A_d & B_d \\ 0 & I \end{bmatrix}.
 $$
 
-The continuous-time spectrum of $A$ is $\{0, 0, +j n, -j n\}$, so the open-loop system is marginally stable - the secular drift along $y$ and the radial / along-track coupling oscillation at the orbital frequency are unattenuated. Discretely, $|\lambda_i(A_d)| = 1$ for all $i$. Control is required for any non-trivial rendezvous.
+The continuous-time spectrum of $A$ is $\{0, 0, +j n, -j n\}$, so the open-loop system is marginally stable -- the secular drift along $y$ and the radial / along-track coupling oscillation at the orbital frequency are unattenuated. Discretely, every eigenvalue of $A_d$ has unit modulus
+
+$$
+|\lambda_i(A_d)| = 1 \quad \text{for all } i.
+$$
+
+Control is required for any non-trivial rendezvous.
 
 ### 2.3 Disturbance model
 
-A constant additive acceleration $\mathbf{w} = (w_x, w_y)^\top$ enters through the same channel as the control input. It models the residual of differential drag, the J2 zonal harmonic, third-body attraction, and any other long-period perturbation. The simulator injects $m \mathbf{w}$ as a thrust-equivalent disturbance at every step. The MPC controller does not see $\mathbf{w}$.
+A constant additive acceleration
+
+$$
+\mathbf{w} = (w_x, w_y)^\top
+$$
+
+enters through the same channel as the control input. It models the residual of differential drag, the J2 zonal harmonic, third-body attraction, and any other long-period perturbation. The simulator injects $m \mathbf{w}$ as a thrust-equivalent disturbance at every step. The MPC controller does not see $\mathbf{w}$.
 
 ---
 
@@ -171,7 +183,7 @@ $$
 
 ### 3.2 Terminal cost via the discrete Riccati equation
 
-The terminal-cost matrix $P$ is chosen as the unique symmetric positive-definite solution of the discrete-time algebraic Riccati equation associated with the unconstrained infinite-horizon LQR problem on $(A_d, B_d, Q, R)$:
+The terminal-cost matrix $P$ is chosen as the unique symmetric positive-definite solution of the discrete-time algebraic Riccati equation associated with the unconstrained infinite-horizon LQR problem on the discrete-time pair with weights $Q$ and $R$:
 
 $$
 P = Q + A_d^\top P A_d - A_d^\top P B_d (R + B_d^\top P B_d)^{-1} B_d^\top P A_d.
@@ -183,7 +195,13 @@ $$
 K = (R + B_d^\top P B_d)^{-1} B_d^\top P A_d,
 $$
 
-and the closed-loop matrix $A_K = A_d - B_d K$ is Schur. A direct consequence of the Riccati equation is the identity used in the stability proof below:
+and the closed-loop matrix under LQR feedback
+
+$$
+A_K = A_d - B_d K
+$$
+
+is Schur. A direct consequence of the Riccati equation is the identity used in the stability proof below:
 
 $$
 \mathbf{x}^\top P \mathbf{x} = \mathbf{x}^\top (Q + K^\top R K) \mathbf{x} + \mathbf{x}^\top A_K^\top P A_K \mathbf{x}, \qquad \forall \mathbf{x} \in \mathbb{R}^4.
@@ -227,7 +245,13 @@ $$
 |\mathbf{k}_i^\top \mathbf{x}|^2 \le (\mathbf{k}_i^\top P^{-1} \mathbf{k}_i)(\mathbf{x}^\top P \mathbf{x}) \le \rho \cdot \mathbf{k}_i^\top P^{-1} \mathbf{k}_i.
 $$
 
-Requiring $|\mathbf{k}_i^\top \mathbf{x}| \le T_\mathrm{max}$ on every channel imposes
+Requiring the per-channel bound
+
+$$
+|\mathbf{k}_i^\top \mathbf{x}| \le T_\mathrm{max}
+$$
+
+for every $i$ imposes
 
 $$
 \rho \le \rho^\star_\mathrm{in} := \frac{T_\mathrm{max}^2}{\max_i \mathbf{k}_i^\top P^{-1} \mathbf{k}_i}.
@@ -239,7 +263,13 @@ $$
 \rho \le \rho^\star_\mathrm{st} := \frac{v_\mathrm{plan}^2}{\max_{i \in \{3,4\}} \mathbf{e}_i^\top P^{-1} \mathbf{e}_i},
 $$
 
-where $v_\mathrm{plan} = v_\mathrm{max}(1 - \mathrm{margin})$ is the tightened velocity bound the MPC plans against.
+where the tightened planning bound is
+
+$$
+v_\mathrm{plan} = v_\mathrm{max}(1 - \mathrm{margin}),
+$$
+
+the velocity bound the MPC plans against (with a small margin below the reported limit).
 
 The controller computes both bounds analytically at construction time and uses the tighter one:
 
@@ -291,7 +321,13 @@ $$
 \mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star.
 $$
 
-  The appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
+  The appended transition
+
+$$
+A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)
+$$
+
+holds by construction.
 - **Input bounds.** The first $N - 1$ entries of the candidate are the shifted optimal inputs
 
 $$
