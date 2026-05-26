@@ -14,7 +14,7 @@
 A chaser spacecraft must rendezvous with a passive target on a circular reference orbit around Earth. The chaser is modelled by the Clohessy-Wiltshire (CW) equations expressed in the target's local-vertical / local-horizontal (LVLH) frame. The CW equations are an **exact** linearisation of the relative orbital dynamics for small relative separations on a circular target orbit, so the resulting plant is genuinely LTI - no approximation residual.
 
 ### Control objective
-Drive the chaser's relative state to the origin (the docking point) and stabilise it there, while respecting per-axis thrust bounds and in the presence of a constant additive disturbance modelling differential drag and other unmodelled forces.
+Drive the chaser's relative state to the origin (the docking point) and stabilise it there, **subject to two constraint families**: an input bound on per-axis thrust ($\|\mathbf{u}\|_\infty \le T_\mathrm{max}$, the actuator limit) and a state bound on per-axis relative velocity ($|\dot x|, |\dot y| \le v_\mathrm{max}$, a soft-docking safety envelope that prevents the chaser from approaching the target too fast). A constant additive disturbance models residual orbital perturbations such as differential drag.
 
 ### Class of methods
 **Constrained linear model-predictive control with a terminal cost and terminal set.** The MPC value function $J^*$ is constructed jointly with the LQR-derived terminal ingredients so that the closed loop admits a clean stability proof in the Mayne-Rawlings framework (Section 3).
@@ -48,10 +48,11 @@ Drive the chaser's relative state to the origin (the docking point) and stabilis
 | --- | --- | --- |
 | $x, y$ | relative position, radial and along-track | m |
 | $\dot x, \dot y$ | relative velocity components | m/s |
-| $u_x, u_y$ | per-axis thrust (control input) | N, $\|u_i\| \le T_\mathrm{max}$ |
+| $u_x, u_y$ | per-axis thrust (control input) | N, $|u_i| \le T_\mathrm{max}$ |
 | $n$ | target's mean orbital rate | rad/s |
 | $m$ | chaser mass | kg |
-| $T_\mathrm{max}$ | per-axis thrust bound | N |
+| $T_\mathrm{max}$ | per-axis thrust bound (input constraint) | N |
+| $v_\mathrm{max}$ | per-axis relative velocity bound (state constraint) | m/s |
 | $T_s$ | sampling period | s |
 | $N$ | MPC prediction horizon | steps |
 
@@ -115,10 +116,10 @@ $$
 subject to
 
 $$
-\mathbf{x}_0 = \mathbf{x}_k, \quad \mathbf{x}_{i+1} = A_d \mathbf{x}_i + B_d \mathbf{u}_i, \quad \mathbf{u}_i \in \mathcal{U}, \quad \mathbf{x}_N \in X_f,
+\mathbf{x}_0 = \mathbf{x}_k, \quad \mathbf{x}_{i+1} = A_d \mathbf{x}_i + B_d \mathbf{u}_i, \quad \mathbf{u}_i \in \mathcal{U}, \quad \mathbf{x}_i \in \mathcal{X}\ (i \ge 1), \quad \mathbf{x}_N \in X_f,
 $$
 
-where the input set is the per-axis box $\mathcal{U} = \{ \mathbf{u} : \|\mathbf{u}\|_\infty \le T_\mathrm{max} \}$ and the terminal set $X_f$ is specified in Section 3.3. The minimiser is the open-loop sequence $\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star)$; only $\mathbf{u}_0^\star$ is applied to the plant before the next solve. The optimal value of the problem is denoted $J^\star(\mathbf{x}_k)$.
+where the input set is the per-axis box $\mathcal{U} = \{ \mathbf{u} : |u_x|, |u_y| \le T_\mathrm{max} \}$, the state set is the velocity box $\mathcal{X} = \{ \mathbf{x} : |\dot x|, |\dot y| \le v_\mathrm{max} \}$ (enforced from the second predicted step onward, since the current measured state cannot be modified instantaneously), and the terminal set $X_f$ is specified in Section 3.3. In the implementation $\mathcal{X}$ is tightened by a small robustness margin so that the additive disturbance does not push the actual state past the reported bound. The minimiser is the open-loop sequence $\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star)$; only $\mathbf{u}_0^\star$ is applied to the plant before the next solve. The optimal value of the problem is denoted $J^\star(\mathbf{x}_k)$.
 
 The state and input weights $Q \succ 0$, $R \succ 0$ are chosen jointly with the terminal cost $P$ below. Each $\mathbf{u}_i^\star$ depends implicitly on $\mathbf{x}_k$, and the closed loop is governed by the feedback law $\mathbf{u}_k = \mathbf{u}_0^\star(\mathbf{x}_k)$.
 
@@ -252,9 +253,9 @@ Note. The proof is for the **nominal** closed loop (no disturbance). Under the s
 
 We ship two LQR baselines whose specific failure modes motivate the constrained MPC design.
 
-- **Unconstrained LQR** uses the same gain $K$ as the terminal controller above, applied at every step with no constraint enforcement. The closed loop is exponentially stable on the linear model, but the gain $K$ is sized for $(Q, R)$ without knowledge of $T_\mathrm{max}$. Starting from $\mathbf{x}_0 = (30, 30, 0, 0)$, the initial command magnitude $\|K \mathbf{x}_0\|_\infty \approx 275$ N - **roughly five-and-a-half times the actuator bound**. The trajectory cannot be physically reproduced; the simulator records the violation as part of the AIDA-mandated baseline comparison.
+- **Unconstrained LQR** uses the same gain $K$ as the terminal controller above, applied at every step with no constraint enforcement. The closed loop is exponentially stable on the linear model, but the gain $K$ is sized for $(Q, R)$ without knowledge of $T_\mathrm{max}$ or $v_\mathrm{max}$. Starting from $\mathbf{x}_0 = (30, 30, 0, 0)$, the initial command magnitude $\|K \mathbf{x}_0\|_\infty \approx 275$ N - **roughly five-and-a-half times the actuator bound** - and the resulting transient velocity peaks at about $1.9$ m/s, **nearly four times the state bound** $v_\mathrm{max} = 0.5$ m/s. Both constraint families are violated.
 
-- **Saturated LQR** uses the same gain $K$ but post-hoc clips every command to $\mathcal{U}$ before applying it. The actuator is now respected, but the stability proof of the underlying LQR collapses: $-K \mathbf{x}$ is replaced by a saturation nonlinearity whose closed-loop matrix is no longer $A_K$. The trajectory in our experiments still converges because the open-loop CW dynamics are marginally stable and the saturation only acts transiently, but along the way the thrust rings against the limit (Section 7) - behaviour that the MPC value function rules out by design.
+- **Saturated LQR** uses the same gain $K$ but post-hoc clips every command to $\mathcal{U}$ before applying it. The actuator is now respected, but the stability proof of the underlying LQR collapses ($-K \mathbf{x}$ is replaced by a saturation nonlinearity whose closed-loop matrix is no longer $A_K$), and the **state constraint is still violated** -- the saturated input bang-bangs at the limit during the transient and the chaser still overshoots $v_\mathrm{max}$ by about a factor of three. Post-hoc saturation handles the input bound but not the state bound.
 
 By contrast the MPC controller treats the actuator bound as a **first-class** constraint in the optimisation, so the closed loop inherits *both* feasibility-by-construction *and* the Lyapunov decrease of Section 3.5.
 
@@ -309,6 +310,8 @@ Outputs:   trajectory  (t_k, x_k, u_k, J*_k)  for k = 0, ..., n_steps
 | Mean orbital rate | $n$ | $1.131 \times 10^{-3}$ rad/s |
 | Chaser mass | $m$ | 500 kg |
 | Per-axis thrust bound | $T_\mathrm{max}$ | 50 N |
+| Per-axis velocity bound | $v_\mathrm{max}$ | 0.5 m/s |
+| Robustness margin on $v_\mathrm{max}$ | -- | 5 % |
 | Sampling period | $T_s$ | 1 s |
 | Prediction horizon | $N$ | 60 steps |
 | State weight | $Q$ | $\mathrm{diag}(10, 10, 1, 1)$ |
@@ -352,8 +355,9 @@ python -m src.main --scenario mpc                   # only the MPC scenario
 | `figures/lqr_saturated/` | saturated-LQR baseline plots |
 | `figures/comparison_position.png` | overlay of the three chaser paths in the LVLH frame |
 | `figures/comparison_lyapunov.png` | overlay of $J^\star(t)$ across scenarios |
-| `figures/comparison_thrust.png` | overlay of $\|\mathbf{u}\|_\infty(t)$ vs the actuator bound |
-| `figures/comparison_violations.png` | bar chart of constraint-violation counts |
+| `figures/comparison_thrust.png` | overlay of $|u|_\infty(t)$ vs the actuator bound |
+| `figures/comparison_velocity.png` | overlay of $\max(|\dot x|, |\dot y|)(t)$ vs the state bound |
+| `figures/comparison_violations.png` | grouped bar chart of input and state constraint violations |
 | `animations/mpc.gif` | main result animation |
 | `animations/lqr_unconstrained.gif` | unconstrained-LQR animation |
 | `animations/lqr_saturated.gif` | saturated-LQR animation |
@@ -386,9 +390,9 @@ The control signal saturates at $\pm T_\mathrm{max}$ during the bang-bang openin
 
 The two LQR baselines highlight the constraint-handling value of MPC.
 
-**Unconstrained LQR** commands an initial thrust of $\approx 275$ N - over five times the per-axis bound - and registers 15 constraint violations across the simulation. The trajectory still approaches the origin because the controller is allowed to pretend the actuator has infinite authority; this scenario exists as a counter-example, not a serious baseline.
+**Unconstrained LQR** commands an initial thrust of $\approx 275$ N - over five times the per-axis bound - and registers 15 input violations across the simulation. The transient velocity peaks at $\approx 1.94$ m/s, far above the state bound $v_\mathrm{max} = 0.5$ m/s; the LQR closed loop has no state-constraint awareness, so it accumulates 22 steps of state violations.
 
-**Saturated LQR** clips every LQR command to $\mathcal{U}$ before applying it. The thrust profile rings against the limit during the transient (visible in the comparison plot below) and the closed loop is no longer covered by the LQR stability proof.
+**Saturated LQR** clips every LQR command to $\mathcal{U}$ before applying it. The thrust profile rings against the limit during the transient and the closed loop is no longer covered by the LQR stability proof. Saturation handles the input but not the state constraint: the chaser still races to $\approx 1.57$ m/s, registering 26 state violations.
 
 ### 7.3 Three-way comparison
 
@@ -399,10 +403,16 @@ The two LQR baselines highlight the constraint-handling value of MPC.
 The thrust comparison is the cleanest expression of the MPC advantage. The unconstrained LQR (red) shoots above the actuator bound by a factor of more than five at $t = 0$ and oscillates as it descends; the saturated LQR (blue) sits at the bound during the early phase and re-saturates around $t \approx 15$ s; the MPC (green) saturates only briefly at $t = 0$ and otherwise rides comfortably below the bound, with no oscillation.
 
 <p align="center">
-  <img src="figures/comparison_violations.png" width="540">
+  <img src="figures/comparison_velocity.png" width="720">
 </p>
 
-The constraint-violation bar chart numerically confirms what the thrust plot shows: zero violations for the constrained MPC and the saturated LQR (by clipping), 15 violations for the unconstrained LQR.
+The relative-velocity envelope shows the second part of the story. The MPC's velocity rides just below the bound for the bang-bang opening of the approach (the controller saturates against $v_\mathrm{max}$, not against $T_\mathrm{max}$) and then decays smoothly. The two LQR baselines overshoot the bound by a factor of three (saturated) to four (unconstrained) during the transient, because neither has any state-constraint awareness.
+
+<p align="center">
+  <img src="figures/comparison_violations.png" width="640">
+</p>
+
+The grouped-bar chart numerically confirms the comparison: **zero input violations and zero state violations** for the constrained MPC; the unconstrained LQR violates both (15 input, 22 state); the saturated LQR fixes only the input but still violates the state bound 26 times. **MPC is the only controller that respects all imposed constraints.**
 
 <p align="center">
   <img src="figures/comparison_lyapunov.png" width="720">
@@ -411,10 +421,11 @@ The constraint-violation bar chart numerically confirms what the thrust plot sho
 The Lyapunov overlay shows all three controllers driving the cost down by several orders of magnitude. The constrained MPC's decrease is **provably monotone** (Section 3.5); the saturated-LQR Lyapunov value is non-monotone in places because the underlying gain is no longer matched to the saturated dynamics, and the closed loop is no longer covered by the LQR stability proof.
 
 ### What works
-- $J^\star(\mathbf{x}_k)$ is monotone non-increasing along the closed loop, as proved in Section 3.5.
-- Per-axis thrust commands respect the actuator bound at every step.
+- $J^\star(\mathbf{x}_k)$ is monotone non-increasing along the **nominal** closed loop, as proved in Section 3.5; the disturbed run shows only sub-$10^{-3}$ non-monotone fluctuations in the terminal neighbourhood.
+- Per-axis thrust commands respect the actuator bound at every step (input violations = 0).
+- Per-axis relative velocity respects the state bound at every step (state violations = 0); a 5 % robustness margin baked into the predicted constraints absorbs the disturbance-induced overshoot.
 - The chaser reaches a small neighbourhood of the origin under a constant additive disturbance the controller does not directly observe.
-- Both LQR baselines fail at least one of the constraints (raw violation count or absence of a stability proof under saturation) - confirming that the constrained MPC is necessary rather than optional.
+- Both LQR baselines fail at least one of the constraint families - the unconstrained LQR violates both, the saturated LQR fixes the input but still violates the state bound. The constrained MPC is the only controller that respects all constraints simultaneously.
 
 ### Limitations
 - The stability proof of Section 3.5 is for the nominal closed loop. Under the additive disturbance the chaser converges to a small neighbourhood of the origin rather than to the origin itself; a tube-MPC or offset-free reformulation would close this gap at the cost of additional ingredients.
