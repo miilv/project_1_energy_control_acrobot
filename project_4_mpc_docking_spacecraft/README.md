@@ -131,7 +131,23 @@ $$
 \mathcal{X} = \{ \mathbf{x} : |\dot x|, |\dot y| \le v_\mathrm{max} \}.
 $$
 
-The state-box constraint is enforced from the second predicted step onward, since the current measured state cannot be modified instantaneously; the terminal set $X_f$ is specified in Section 3.3. In the implementation $\mathcal{X}$ is tightened by a small robustness margin so that the additive disturbance does not push the actual state past the reported bound. The minimiser is the open-loop sequence $\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star)$; only $\mathbf{u}_0^\star$ is applied to the plant before the next solve. The optimal value of the problem is denoted $J^\star(\mathbf{x}_k)$.
+The state-box constraint is enforced from the second predicted step onward, since the current measured state cannot be modified instantaneously; the terminal set $X_f$ is specified in Section 3.3. In the implementation $\mathcal{X}$ is tightened by a small robustness margin so that the additive disturbance does not push the actual state past the reported bound. The minimiser is the open-loop input sequence
+
+$$
+\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star),
+$$
+
+and only the first element
+
+$$
+\mathbf{u}_0^\star
+$$
+
+is applied to the plant before the next solve. The optimal value of the problem is denoted
+
+$$
+J^\star(\mathbf{x}_k).
+$$
 
 The state and input weights $Q \succ 0$, $R \succ 0$ are chosen jointly with the terminal cost $P$ below. Each predicted input depends implicitly on the current state, and the closed loop is governed by the feedback law
 
@@ -177,15 +193,15 @@ $$
 
 Two requirements must hold simultaneously for $X_f$ to play its role in the MPC stability proof:
 
-1. **Forward invariance under the terminal controller.** Setting $\mathbf{u} = -K\mathbf{x}$ on $X_f$ keeps the trajectory inside $X_f$. From the Riccati identity in 3.2, $A_K^\top P A_K \preceq P$, so for every $\mathbf{x} \in X_f$ we have
+1. **Forward invariance under the terminal controller.** Setting the input to the LQR feedback on $X_f$ keeps the trajectory inside $X_f$. From the Riccati identity in 3.2 we have $A_K^\top P A_K \preceq P$, so for every state in the ellipsoid
 
    $$
    (A_K \mathbf{x})^\top P (A_K \mathbf{x}) \le \mathbf{x}^\top P \mathbf{x} \le \rho.
    $$
 
-   Forward invariance holds for **every** $\rho > 0$.
+   Forward invariance therefore holds for **every** $\rho > 0$.
 
-2. **Input admissibility.** For every $\mathbf{x} \in X_f$, the LQR action $-K \mathbf{x}$ must lie inside $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
+2. **Input admissibility.** For every state in $X_f$, the LQR action must lie inside $\mathcal{U}$. Let $\mathbf{k}_i^\top$ denote the $i$-th row of $K$. Cauchy-Schwarz in the $P$-induced inner product gives
 
 $$
 |\mathbf{k}_i^\top \mathbf{x}|^2 \le (\mathbf{k}_i^\top P^{-1} \mathbf{k}_i)(\mathbf{x}^\top P \mathbf{x}) \le \rho \cdot \mathbf{k}_i^\top P^{-1} \mathbf{k}_i.
@@ -197,7 +213,7 @@ $$
 \rho \le \rho^\star_\mathrm{in} := \frac{T_\mathrm{max}^2}{\max_i \mathbf{k}_i^\top P^{-1} \mathbf{k}_i}.
 $$
 
-3. **State admissibility.** Because the candidate-shift sequence used in Section 3.4 places the appended state $A_K \mathbf{x}_N^\star$ inside $X_f$, that state must also satisfy the velocity box $\mathcal{X}$ from Section 2 to be a feasible MPC step. The same Cauchy-Schwarz argument applied to the coordinate-axis rows $\mathbf{e}_i$ for $i \in \{3, 4\}$ (the $\dot x, \dot y$ components) gives
+3. **State admissibility.** Because the candidate-shift sequence used in Section 3.4 places the appended state inside $X_f$, that state must also satisfy the velocity box $\mathcal{X}$ from Section 2 to be a feasible MPC step. Applying the same Cauchy-Schwarz argument to the coordinate-axis rows that pick out the $\dot x, \dot y$ components gives
 
 $$
 \rho \le \rho^\star_\mathrm{st} := \frac{v_\mathrm{plan}^2}{\max_{i \in \{3,4\}} \mathbf{e}_i^\top P^{-1} \mathbf{e}_i},
@@ -211,7 +227,7 @@ $$
 \rho^\star = \min(\rho^\star_\mathrm{in}, \rho^\star_\mathrm{st}).
 $$
 
-With the default configuration this yields $\rho^\star_\mathrm{in} \approx 1380$ (input-binding) and $\rho^\star_\mathrm{st} \approx 594$ (state-binding), so $\rho^\star = 594$: the velocity constraint is the tighter one.
+With the default configuration the input-binding bound is approximately 1380 and the state-binding bound is approximately 594, so the velocity constraint is the tighter one and is the value picked by the controller.
 
 ### 3.4 Recursive feasibility
 
@@ -235,7 +251,7 @@ $$
 
 also admits a feasible MPC solution.
 
-**Proof.** Define the **candidate sequence** at $\mathbf{x}_{k+1}$ by shifting the previously optimal sequence by one step and appending the LQR action evaluated at $\mathbf{x}_N^\star$:
+**Proof.** Define the **candidate sequence** at the next state by shifting the previously optimal sequence by one step and appending the LQR action evaluated at the previous terminal state:
 
 $$
 \hat{\mathbf{u}} = (\mathbf{u}_1^\star, \mathbf{u}_2^\star, \dots, \mathbf{u}_{N-1}^\star, -K \mathbf{x}_N^\star).
@@ -256,11 +272,23 @@ Each constraint of the MPC problem is checked in turn.
   $$
 
   The appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
-- **Input bounds.** The first $N - 1$ entries of the candidate are $\mathbf{u}_1^\star, \dots, \mathbf{u}_{N-1}^\star$, all in $\mathcal{U}$ by feasibility of the previous solution. The appended input is $-K \mathbf{x}_N^\star$, which lies in $\mathcal{U}$ because the terminal state $\mathbf{x}_N^\star$ lies in $X_f$ and we have chosen $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
-- **State bounds.** Predicted states $\mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star$ all lie in $\mathcal{X}$ by feasibility of the previous solution. The newly appended state $A_K \mathbf{x}_N^\star$ lies in $X_f$ by forward invariance, and the choice $\rho \le \rho^\star_\mathrm{st}$ guarantees it also lies in $\mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
-- **Terminal set.** The appended terminal state is $A_K \mathbf{x}_N^\star$; by forward invariance of $X_f$, this lies in $X_f$.
+- **Input bounds.** The first $N - 1$ entries of the candidate are the shifted optimal inputs
 
-All MPC constraints are satisfied. Hence $\hat{\mathbf{u}}$ is feasible at $\mathbf{x}_{k+1}$. $\square$
+  $$
+  \mathbf{u}_1^\star, \dots, \mathbf{u}_{N-1}^\star,
+  $$
+
+  all in $\mathcal{U}$ by feasibility of the previous solution. The appended input is $-K \mathbf{x}_N^\star$, which lies in $\mathcal{U}$ because the terminal state lies in $X_f$ and we have chosen $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
+- **State bounds.** Predicted states from the previous solution
+
+  $$
+  \mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star
+  $$
+
+  all lie in $\mathcal{X}$. The newly appended state lies in $X_f$ by forward invariance, and the choice $\rho \le \rho^\star_\mathrm{st}$ guarantees it also lies in $\mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
+- **Terminal set.** The appended terminal state is the LQR-update of the previous terminal state; by forward invariance of $X_f$, it lies in $X_f$.
+
+All MPC constraints are satisfied, so the candidate is feasible at the next step. $\square$
 
 ### 3.5 Lyapunov decrease of $J^\star$
 
@@ -276,7 +304,7 @@ $$
 J^\star(\mathbf{x}_{k+1}) \le \hat J,
 $$
 
-where $\hat J$ is the cost of the feasible candidate $\hat{\mathbf{u}}$ at $\mathbf{x}_{k+1}$. Splitting the optimal cost at $\mathbf{x}_k$ as
+where $\hat J$ is the cost of the feasible candidate sequence at the next state. Splitting the optimal cost at the current state as
 
 $$
 J^\star(\mathbf{x}_k) = \underbrace{\mathbf{x}_0^{\star\top} Q \mathbf{x}_0^\star + \mathbf{u}_0^{\star\top} R \mathbf{u}_0^\star}_{\text{first stage}} + \sum_{i=1}^{N-1}\bigl(\mathbf{x}_i^{\star\top} Q \mathbf{x}_i^\star + \mathbf{u}_i^{\star\top} R \mathbf{u}_i^\star\bigr) + \mathbf{x}_N^{\star\top} P \mathbf{x}_N^\star
@@ -330,7 +358,7 @@ $$
 \mathbf{x}_k \to 0 \quad\text{and}\quad \mathbf{u}_k^\star \to 0 \quad\text{as } k \to \infty.
 $$
 
-The MPC closed loop is therefore asymptotically stable with region of attraction equal to the feasible set $X_N$ (the set of initial states for which the MPC problem admits a solution). With the default parameters $X_N$ is large enough to include the simulation's initial state $\mathbf{x}_0 = (30, 30, 0, 0)$.
+The MPC closed loop is therefore asymptotically stable with region of attraction equal to the feasible set $X_N$ -- the set of initial states for which the MPC problem admits a solution. With the default parameters $X_N$ is large enough to include the simulation's initial state.
 
 Note. The proof is for the **nominal** closed loop (no disturbance). Under the small additive disturbance used in the simulator the chaser converges to a small neighbourhood of the origin rather than to the origin itself - the size of the neighbourhood scales linearly with the disturbance magnitude. Tube-MPC techniques extend the proof to robust convergence; we have not implemented them in this submission.
 
