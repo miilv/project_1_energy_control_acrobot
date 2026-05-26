@@ -388,7 +388,13 @@ The MPC drives the chaser from $\mathbf{x}_0 = (30, 30, 0, 0)$ to a steady-state
   <img src="figures/mpc/lyapunov.png" width="640">
 </p>
 
-The Lyapunov plot above shows $J^\star(\mathbf{x}_k)$ on a log scale. The value drops by more than six orders of magnitude over the 200 s simulation. Once inside the small terminal neighbourhood, the constant disturbance forces tiny non-monotone fluctuations of order $10^{-3}$ — the nominal decrease bound of Section 3.5 holds in the disturbance-free closed loop; under the additive disturbance the inequality is replaced by $J^\star(\mathbf{x}_{k+1}) \le J^\star(\mathbf{x}_k) - \mathbf{x}_k^\top Q \mathbf{x}_k - \mathbf{u}_0^{\star\top} R \mathbf{u}_0^\star + \varepsilon$ for a small $\varepsilon$ proportional to the disturbance magnitude.
+The Lyapunov plot above shows the MPC optimal value on a log scale. It drops by more than six orders of magnitude over the 200 s simulation. Once inside the small terminal neighbourhood, the constant disturbance forces tiny non-monotone fluctuations of order $10^{-3}$. The nominal decrease bound of Section 3.5 holds in the disturbance-free closed loop; under the additive disturbance the inequality is replaced by
+
+$$
+J^\star(\mathbf{x}_{k+1}) \le J^\star(\mathbf{x}_k) - \mathbf{x}_k^\top Q \mathbf{x}_k - \mathbf{u}_0^{\star\top} R \mathbf{u}_0^\star + \varepsilon
+$$
+
+for a small $\varepsilon$ proportional to the disturbance magnitude.
 
 <p align="center">
   <img src="figures/mpc/control.png" width="640">
