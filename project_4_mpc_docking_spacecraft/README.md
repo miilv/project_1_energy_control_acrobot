@@ -187,7 +187,25 @@ The controller computes both $\rho^\star_\mathrm{in}$ and $\rho^\star_\mathrm{st
 
 ### 3.4 Recursive feasibility
 
-**Lemma (recursive feasibility).** Let $\mathbf{x}_k$ admit a feasible MPC solution with optimal sequence $\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star)$ and predicted states $(\mathbf{x}_0^\star = \mathbf{x}_k, \mathbf{x}_1^\star, \dots, \mathbf{x}_N^\star)$. Then $\mathbf{x}_{k+1} = A_d \mathbf{x}_k + B_d \mathbf{u}_0^\star$ also admits a feasible MPC solution.
+**Lemma (recursive feasibility).** Let $\mathbf{x}_k$ admit a feasible MPC solution with optimal input sequence
+
+$$
+\mathbf{u}^\star = (\mathbf{u}_0^\star, \dots, \mathbf{u}_{N-1}^\star)
+$$
+
+and predicted states
+
+$$
+(\mathbf{x}_0^\star = \mathbf{x}_k, \mathbf{x}_1^\star, \dots, \mathbf{x}_N^\star).
+$$
+
+Then the next closed-loop state
+
+$$
+\mathbf{x}_{k+1} = A_d \mathbf{x}_k + B_d \mathbf{u}_0^\star
+$$
+
+also admits a feasible MPC solution.
 
 **Proof.** Define the **candidate sequence** at $\mathbf{x}_{k+1}$ by shifting the previously optimal sequence by one step and appending the LQR action evaluated at $\mathbf{x}_N^\star$:
 
@@ -195,10 +213,22 @@ $$
 \hat{\mathbf{u}} = (\mathbf{u}_1^\star, \mathbf{u}_2^\star, \dots, \mathbf{u}_{N-1}^\star, -K \mathbf{x}_N^\star).
 $$
 
-The candidate's predicted states are $(\mathbf{x}_1^\star, \mathbf{x}_2^\star, \dots, \mathbf{x}_N^\star, A_K \mathbf{x}_N^\star)$. Each constraint of the MPC problem is checked in turn.
+The candidate's predicted states are
 
-- **Dynamics.** Each transition $\mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star$ for $i = 1, \dots, N-1$ holds by the optimality of $\mathbf{u}^\star$ at $\mathbf{x}_k$; the appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
-- **Input bounds.** $\mathbf{u}_i^\star \in \mathcal{U}$ for $i = 1, \dots, N-1$ by feasibility of $\mathbf{u}^\star$. The appended input $-K \mathbf{x}_N^\star$ lies in $\mathcal{U}$ because $\mathbf{x}_N^\star \in X_f$ and $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
+$$
+(\mathbf{x}_1^\star, \mathbf{x}_2^\star, \dots, \mathbf{x}_N^\star, A_K \mathbf{x}_N^\star).
+$$
+
+Each constraint of the MPC problem is checked in turn.
+
+- **Dynamics.** Each transition holds by the optimality of $\mathbf{u}^\star$ at $\mathbf{x}_k$ for $i = 1, \dots, N - 1$:
+
+  $$
+  \mathbf{x}_{i+1}^\star = A_d \mathbf{x}_i^\star + B_d \mathbf{u}_i^\star.
+  $$
+
+  The appended transition $A_K \mathbf{x}_N^\star = A_d \mathbf{x}_N^\star + B_d (-K \mathbf{x}_N^\star)$ holds by construction.
+- **Input bounds.** $\mathbf{u}_i^\star \in \mathcal{U}$ for $i = 1, \dots, N - 1$ by feasibility of $\mathbf{u}^\star$. The appended input $-K \mathbf{x}_N^\star$ lies in $\mathcal{U}$ because $\mathbf{x}_N^\star \in X_f$ and $\rho \le \rho^\star_\mathrm{in}$ (Section 3.3).
 - **State bounds.** Predicted states $\mathbf{x}_2^\star, \dots, \mathbf{x}_{N-1}^\star \in \mathcal{X}$ by feasibility of $\mathbf{u}^\star$. The newly appended state is $A_K \mathbf{x}_N^\star \in X_f$ by forward invariance, and $\rho \le \rho^\star_\mathrm{st}$ guarantees $A_K \mathbf{x}_N^\star \in \mathcal{X}$ via the Cauchy-Schwarz bound of Section 3.3.
 - **Terminal set.** The appended terminal state is $A_K \mathbf{x}_N^\star$; by forward invariance of $X_f$, this lies in $X_f$.
 
@@ -212,7 +242,13 @@ $$
 J^\star(\mathbf{x}_{k+1}) \le J^\star(\mathbf{x}_k) - \mathbf{x}_k^\top Q \mathbf{x}_k - \mathbf{u}_0^{\star\top} R \mathbf{u}_0^\star.
 $$
 
-**Proof.** By construction $J^\star(\mathbf{x}_{k+1}) \le \hat J$, where $\hat J$ is the cost of the feasible candidate $\hat{\mathbf{u}}$ at $\mathbf{x}_{k+1}$. Splitting the optimal cost at $\mathbf{x}_k$ as
+**Proof.** By construction
+
+$$
+J^\star(\mathbf{x}_{k+1}) \le \hat J,
+$$
+
+where $\hat J$ is the cost of the feasible candidate $\hat{\mathbf{u}}$ at $\mathbf{x}_{k+1}$. Splitting the optimal cost at $\mathbf{x}_k$ as
 
 $$
 J^\star(\mathbf{x}_k) = \underbrace{\mathbf{x}_0^{\star\top} Q \mathbf{x}_0^\star + \mathbf{u}_0^{\star\top} R \mathbf{u}_0^\star}_{\text{first stage}} + \sum_{i=1}^{N-1}\bigl(\mathbf{x}_i^{\star\top} Q \mathbf{x}_i^\star + \mathbf{u}_i^{\star\top} R \mathbf{u}_i^\star\bigr) + \mathbf{x}_N^{\star\top} P \mathbf{x}_N^\star
@@ -254,7 +290,13 @@ $$
 \sum_{k=0}^{\infty} \bigl(\mathbf{x}_k^\top Q \mathbf{x}_k + \mathbf{u}_k^{\star\top} R \mathbf{u}_k^\star\bigr) \le J^\star(\mathbf{x}_0) < \infty.
 $$
 
-Since $Q \succ 0$, the summability of $\mathbf{x}_k^\top Q \mathbf{x}_k$ forces $\mathbf{x}_k \to 0$, and similarly $\mathbf{u}_k^\star \to 0$. The MPC closed loop is therefore asymptotically stable with region of attraction equal to the feasible set $X_N$ (the set of $\mathbf{x}_0$ for which the MPC problem admits a solution). With the default parameters $X_N$ is large enough to include the simulation's initial state $\mathbf{x}_0 = (30, 30, 0, 0)$.
+Since $Q \succ 0$, the summability of the quadratic stage cost forces
+
+$$
+\mathbf{x}_k \to 0 \quad\text{and}\quad \mathbf{u}_k^\star \to 0 \quad\text{as } k \to \infty.
+$$
+
+The MPC closed loop is therefore asymptotically stable with region of attraction equal to the feasible set $X_N$ (the set of initial states for which the MPC problem admits a solution). With the default parameters $X_N$ is large enough to include the simulation's initial state $\mathbf{x}_0 = (30, 30, 0, 0)$.
 
 Note. The proof is for the **nominal** closed loop (no disturbance). Under the small additive disturbance used in the simulator the chaser converges to a small neighbourhood of the origin rather than to the origin itself - the size of the neighbourhood scales linearly with the disturbance magnitude. Tube-MPC techniques extend the proof to robust convergence; we have not implemented them in this submission.
 
