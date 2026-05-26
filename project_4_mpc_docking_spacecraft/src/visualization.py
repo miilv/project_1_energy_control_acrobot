@@ -22,16 +22,17 @@ def _ensure_dir(path):
 # Per-scenario plots
 # ---------------------------------------------------------------------------
 
-def plot_state_trajectories(result, save_path):
+def plot_state_trajectories(result, save_path, scenario=None):
     """Relative position and velocity versus time."""
     _ensure_dir(save_path)
+    label = _SHORT.get(scenario, "controller")
     fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
 
     axes[0].plot(result["t"], result["x"], label="$x$ (radial)")
     axes[0].plot(result["t"], result["y"], label="$y$ (along-track)")
     axes[0].axhline(0.0, color="gray", linestyle=":", alpha=0.6)
     axes[0].set_ylabel("Relative position [m]")
-    axes[0].set_title("Relative position: chaser approaches the target at the origin")
+    axes[0].set_title(f"Relative position under {label}")
     axes[0].grid(True, alpha=0.4)
     axes[0].legend()
 
@@ -54,9 +55,10 @@ def plot_state_trajectories(result, save_path):
     plt.close(fig)
 
 
-def plot_control(result, save_path):
+def plot_control(result, save_path, scenario=None):
     """Per-axis thrust with the saturation envelope."""
     _ensure_dir(save_path)
+    label = _SHORT.get(scenario, "controller")
     T_max = float(result["T_max"])
     fig, ax = plt.subplots(figsize=(10, 5))
     t_u = result["t"][:len(result["ux"])]
@@ -66,7 +68,7 @@ def plot_control(result, save_path):
     ax.axhline(-T_max, color="red", linestyle="--", alpha=0.7)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Thrust [N]")
-    ax.set_title("Control input: per-axis thrust within saturation limits")
+    ax.set_title(f"Per-axis thrust commanded by the {label}")
     ax.grid(True, alpha=0.4)
     ax.legend()
     fig.tight_layout()
@@ -74,15 +76,28 @@ def plot_control(result, save_path):
     plt.close(fig)
 
 
-def plot_lyapunov(result, save_path):
-    """Optimal value (MPC) or terminal-cost surrogate (LQR) versus time, log scale."""
+def plot_lyapunov(result, save_path, scenario=None):
+    """Optimal value (MPC) or terminal-cost surrogate (LQR) versus time, log scale.
+
+    For MPC this is the optimisation value ``J^*(x_k)``.  For the LQR
+    baselines it is the quadratic ``x_k' P x_k`` (the same Riccati matrix is
+    used for both designs).  These are different scalars; the y-axis label
+    is set accordingly per scenario.
+    """
     _ensure_dir(save_path)
+    is_mpc = (scenario == "mpc")
+    label = _SHORT.get(scenario, "controller")
+    title = ("MPC optimal value $J^*(x_k)$: monotone decrease under the closed loop"
+             if is_mpc
+             else f"Quadratic $x_k^\\top P x_k$ under the {label} (Lyapunov-style scalar)")
+    ylabel = "$J^*(x_k)$" if is_mpc else r"$x_k^\top P x_k$"
+    line_label = "$J^*(x_k)$" if is_mpc else r"$x_k^\top P x_k$"
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.semilogy(result["t"], np.maximum(result["J"], 1e-12),
-                color="purple", linewidth=1.6, label="$J^*(t)$")
+                color="purple", linewidth=1.6, label=line_label)
     ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Lyapunov value $J^*$")
-    ax.set_title("MPC optimal value $J^*(x_k)$: monotone decrease confirms stability")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
     ax.grid(True, which="both", alpha=0.4)
     ax.legend()
     fig.tight_layout()
@@ -90,9 +105,10 @@ def plot_lyapunov(result, save_path):
     plt.close(fig)
 
 
-def plot_position_trajectory(result, save_path):
+def plot_position_trajectory(result, save_path, scenario=None):
     """2D x-y trace coloured by time, with start and target markers."""
     _ensure_dir(save_path)
+    label = _SHORT.get(scenario, "controller")
     fig, ax = plt.subplots(figsize=(8, 7))
     pts = np.array([result["x"], result["y"]]).T.reshape(-1, 1, 2)
     segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
@@ -113,7 +129,7 @@ def plot_position_trajectory(result, save_path):
     ax.set_ylim(ylim)
     ax.set_xlabel("$x$ -- radial [m]")
     ax.set_ylabel("$y$ -- along-track [m]")
-    ax.set_title("2D trajectory in the target's LVLH frame")
+    ax.set_title(f"2D trajectory under {label} (LVLH frame)")
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, alpha=0.4)
     ax.legend(loc="upper right")
@@ -124,15 +140,16 @@ def plot_position_trajectory(result, save_path):
     plt.close(fig)
 
 
-def plot_distance_to_target(result, save_path):
+def plot_distance_to_target(result, save_path, scenario=None):
     """Range $r(t) = \sqrt{x^2 + y^2}$ on log scale."""
     _ensure_dir(save_path)
+    label = _SHORT.get(scenario, "controller")
     r = np.sqrt(result["x"] ** 2 + result["y"] ** 2)
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.semilogy(result["t"], np.maximum(r, 1e-12), color="darkred", linewidth=1.5)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Range to target [m]")
-    ax.set_title("Range to target: exponential approach under MPC")
+    ax.set_title(f"Range to target over time under the {label}")
     ax.grid(True, which="both", alpha=0.4)
     fig.tight_layout()
     fig.savefig(save_path, dpi=150)
@@ -153,6 +170,12 @@ _LABELS = {
     "mpc": "MPC (ours)",
     "lqr_unconstrained": "LQR -- unconstrained (saturates)",
     "lqr_saturated": "LQR -- post-hoc saturated",
+}
+
+_SHORT = {
+    "mpc": "constrained MPC",
+    "lqr_unconstrained": "unconstrained LQR",
+    "lqr_saturated": "saturated LQR",
 }
 
 
@@ -181,15 +204,21 @@ def plot_comparison_position(results_by_name, save_path):
 
 
 def plot_comparison_J(results_by_name, save_path):
-    """Overlay J*(t) across scenarios, log scale."""
+    """Overlay each scenario's value function on a log scale.
+
+    Note that the y-axis is a *Lyapunov-style scalar* whose exact identity
+    differs across scenarios: it is the MPC optimal value $J^*(x_k)$ for the
+    constrained MPC and the quadratic $x_k^\\top P x_k$ for the two LQR
+    baselines.  The same Riccati $P$ underlies both quantities.
+    """
     _ensure_dir(save_path)
     fig, ax = plt.subplots(figsize=(10, 5))
     for name, r in results_by_name.items():
         ax.semilogy(r["t"], np.maximum(r["J"], 1e-12), linewidth=1.5,
                     color=_COLORS.get(name), label=_LABELS.get(name, name))
     ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Lyapunov value $J^*$")
-    ax.set_title("Comparison: Lyapunov decrease across scenarios")
+    ax.set_ylabel(r"Lyapunov-style scalar  ($J^*$ for MPC,  $x_k^\top P x_k$ for LQR)")
+    ax.set_title("Comparison: Lyapunov-style value across scenarios")
     ax.grid(True, which="both", alpha=0.4)
     ax.legend()
     fig.tight_layout()

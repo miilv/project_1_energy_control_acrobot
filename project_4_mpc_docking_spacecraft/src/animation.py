@@ -14,7 +14,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.patches import Rectangle
 
 
-def make_gif(result, save_path, fps=20, downsample=None, trail_length=80):
+def make_gif(result, save_path, fps=20, downsample=None, trail_length=80, scenario=None):
     """Render a 2D animation of the chaser approaching the target.
 
     Parameters
@@ -30,6 +30,9 @@ def make_gif(result, save_path, fps=20, downsample=None, trail_length=80):
         rendered GIF lasts roughly 8-10 seconds.
     trail_length : int
         Number of past samples drawn as a fading trail.
+    scenario : str or None
+        Optional short scenario name; used to label the title so multiple
+        animations side-by-side stay distinguishable.
     """
     parent = os.path.dirname(save_path)
     if parent:
@@ -62,7 +65,12 @@ def make_gif(result, save_path, fps=20, downsample=None, trail_length=80):
     ax.set_aspect("equal", adjustable="box")
     ax.set_xlabel("$x$ -- radial [m]")
     ax.set_ylabel("$y$ -- along-track [m]")
-    ax.set_title("Rendezvous in the target's LVLH frame")
+    title_suffix = {
+        "mpc": "constrained MPC",
+        "lqr_unconstrained": "unconstrained LQR",
+        "lqr_saturated": "saturated LQR",
+    }.get(scenario, "controller")
+    ax.set_title(f"Rendezvous in the target's LVLH frame -- {title_suffix}")
     ax.grid(True, alpha=0.3)
 
     # Target marker at origin
